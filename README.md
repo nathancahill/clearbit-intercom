@@ -8,7 +8,7 @@ Automatically note a user's employment and company metrics on Intercom.io.
 
 Add a Webhook Integation in Intercom.io for the User Created event. The format of the URL is:
 
-`http://clearbit-intercom.herokuapp.com/<clearbitkey>+<appid>:<itercomkey>`
+`http://clearbit-intercom.herokuapp.com/<clearbitkey>+<appid>:<intercomkey>`
 
 ![](http://i.imgur.com/UNKh3up.png)
 
