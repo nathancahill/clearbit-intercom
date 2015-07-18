@@ -1,10 +1,12 @@
 ## Clearbit - Intercom.io Integration
 
-Automatically note a user's employment and company metrics on Intercom.io.
+Automatically note a user's employment and company metrics on Intercom.io via [Clearbit](https://clearbit.com/).
 
 ![](http://i.imgur.com/CBzmn2B.png)
 
 ### Usage
+
+Sign up for a Clearbit API key: [clearbit.com](https://clearbit.com/)
 
 Add a Webhook Integation in Intercom.io for the User Created event. The format of the URL is:
 
