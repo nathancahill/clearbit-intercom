@@ -10,6 +10,10 @@ Add a Webhook Integation in Intercom.io for the User Created event. The format o
 
 `http://clearbit-intercom.herokuapp.com/<clearbitkey>+<appid>:<intercomkey>`
 
+ - `clearbitkey` - Your Clearbit API key
+ - `appid` - Your Intercom.io app ID
+ - `intercomkey` - Your Intercom.io API key 
+
 ![](http://i.imgur.com/UNKh3up.png)
 
 ### Deploy
