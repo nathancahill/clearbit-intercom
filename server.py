@@ -1,21 +1,25 @@
 
 import math
+from urlparse import urlparse
 
 from flask import Flask, jsonify, request
 import requests
 
 app = Flask(__name__)
 
-CLEARBIT_USER_ENDPOINT = 'https://person-stream.clearbit.com/v1/people/email/{email}'
-CLEARBIT_COMPANY_ENDPOINT = 'https://company-stream.clearbit.com/v1/companies/domain/{domain}'
+CLEARBIT_USER = 'https://person-stream.clearbit.com/v1/people/email/{email}'
+CLEARBIT_COMPANY = 'https://company-stream.clearbit.com/v1/companies/domain/{domain}'
 INTERCOM_ENDPOINT = 'https://api.intercom.io/notes'
 
 
 def millify(n):
     """
-    Convert number to human-readable amount with K, M, B, T suffixes.
+    Convert number to a human-readable amount with K, M, B, T suffixes.
 
     Adapted from http://stackoverflow.com/a/3155023/1377021
+
+    :n: float. the number to convert to human-readable amount
+    :ret: string. the human-readable amount with K, M, B, T suffixes
     """
     n = float(n)
     millnames = ['', 'K', 'M', 'B', 'T']
@@ -28,9 +32,41 @@ def millify(n):
         return '%.1f%s' % (amount, millnames[millidx])
 
 
+def safe_requests(method, *args, **kwargs):
+    """
+    Return a JSON response from Requests or raise a human-readable exception.
+
+    :method: string. the requests method to call, i.e. 'get' or 'post'
+    :args: args. the args to pass to the requests method
+    :kwargs: kwargs. the kwargs to pass to the requests method
+    :ret: obj. the JSON response
+    """
+    func = getattr(requests, method)
+    domain = urlparse(kwargs.get('url', args[0])).netloc
+
+    try:
+        res = func(*args, **kwargs)
+    except:
+        raise Exception('API call failed to {domain}.'.format(domain=domain))
+
+    try:
+        obj = res.json()
+    except:
+        raise Exception('Invalid response from {domain}.'.format(domain=domain))
+
+    if 'error' in obj:
+        raise Exception('Error response from {domain}.'.format(domain=domain))
+
+    return obj
+
+
 def create_note(person, company=None):
     """
     Create an Intercom.io note from a person and optional compay object.
+
+    :person: obj. a Clearbit person object: https://dashboard.clearbit.com/docs#person-api
+    :company: obj. a Clearbit company object: https://dashboard.clearbit.com/docs#company-api
+    :ret: string. a note string with line breaks for Intercom
     """
     note = ''
     employment = person['employment']
@@ -75,9 +111,12 @@ def webhook(clearbitkey, appid, intercomkey):
 
     /<clearbitkey>+<appid>:<intercomkey>
 
-    :clearbitkey: Clearbit API key.
-    :appid: Intercom.io app id.
-    :intercomkey: Intercom.io API key.
+    :clearbitkey: string. Clearbit API key
+    :appid: string. Intercom.io app id
+    :intercomkey: string. Intercom.io API key
+
+    :json: obj. The user event object posted to the webhook
+    :ret: obj. JSON response with either an error or the created note object
 
     Supports User events, specifically designed for the User Created event.
     Adds a note to the user with their employment and company metrics.
@@ -100,38 +139,21 @@ def webhook(clearbitkey, appid, intercomkey):
         return jsonify(error='User object missing fields.', **res_objs)
 
     try:
-        res = requests.get(CLEARBIT_USER_ENDPOINT.format(email=email),
-                           auth=(clearbitkey, ''))
-    except:
-        return jsonify(error='API call failed to Clearbit.', **res_objs)
-
-    try:
-        person = res.json()
-    except:
-        return jsonify(error='Invalid response from Clearbit.', **res_objs)
-
-    res_objs['person'] = person
-
-    if 'error' in person:
-        return jsonify(error='Error response from Clearbit.', **res_objs)
+        person = safe_requests('get',
+                               CLEARBIT_USER.format(email=email),
+                               auth=(clearbitkey, ''))
+    except Exception as e:
+        return jsonify(error=str(e), **res_objs)
 
     domain = person['employment']['domain']
-    company = None
 
     if domain:
         try:
-            res = requests.get(CLEARBIT_COMPANY_ENDPOINT.format(domain=domain),
-                               auth=(clearbitkey, ''))
+            company = safe_requests('get',
+                                    CLEARBIT_COMPANY.format(domain=domain),
+                                    auth=(clearbitkey, ''))
         except:
-            pass
-        else:
-            try:
-                company = res.json()
-            except:
-                pass
-            else:
-                if 'error' in company:
-                    company = None
+            company = None
 
     res_objs['company'] = company
 
@@ -141,17 +163,13 @@ def webhook(clearbitkey, appid, intercomkey):
         return jsonify(error='Failed to generate note for user.', **res_objs)
 
     try:
-        res = requests.post(INTERCOM_ENDPOINT,
-                            json=dict(user=dict(id=id), body=note),
-                            headers=dict(accept='application/json'),
-                            auth=(appid, intercomkey))
-    except:
-        return jsonify(error='API call failed to Intercom.', **res_objs)
-
-    try:
-        result = res.json()
-    except:
-        return jsonify(error='Invalid response from Intercom', **res_objs)
+        result = safe_requests('post',
+                               INTERCOM_ENDPOINT,
+                               json=dict(user=dict(id=id), body=note),
+                               headers=dict(accept='application/json'),
+                               auth=(appid, intercomkey))
+    except Exception as e:
+        return jsonify(error=str(e), **res_objs)
 
     return jsonify(note=result, **res_objs)
 
